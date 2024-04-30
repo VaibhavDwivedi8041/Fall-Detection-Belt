@@ -1,0 +1,79 @@
+#include "I2Cdev.h"
+#include "MPU6050.h"
+
+#if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
+    #include "Wire.h"
+#endif
+
+MPU6050 accelgyro;
+
+
+int16_t ax, ay, az;
+int16_t gx, gy, gz;
+
+const float fallThreshold = 650000; 
+const int sampleInterval = 10;   
+float prevAccX = 0.0, prevAccY = 0.0, prevAccZ = 0.0;
+
+#define LED_PIN 13
+bool blinkState = false;
+
+void setup() {
+    #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
+        Wire.begin();
+    #elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
+        Fastwire::setup(400, true);
+    #endif
+    Serial.begin(38400);
+    Serial.println("Initializing I2C devices...");
+    accelgyro.initialize();
+    Serial.println("Testing device connections...");
+    Serial.println(accelgyro.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
+
+    Serial.println("Updating internal sensor offsets...");
+    Serial.print(accelgyro.getXAccelOffset()); Serial.print("\t"); 
+    Serial.print(accelgyro.getYAccelOffset()); Serial.print("\t"); 
+    Serial.print(accelgyro.getZAccelOffset()); Serial.print("\t"); 
+    Serial.print(accelgyro.getXGyroOffset()); Serial.print("\t"); 
+    Serial.print(accelgyro.getYGyroOffset()); Serial.print("\t"); 
+    Serial.print(accelgyro.getZGyroOffset()); Serial.print("\t"); 
+    Serial.print("\n");
+    accelgyro.setXGyroOffset(220);
+    accelgyro.setYGyroOffset(76);
+    accelgyro.setZGyroOffset(-85);
+    Serial.print(accelgyro.getXAccelOffset()); Serial.print("\t"); 
+    Serial.print(accelgyro.getYAccelOffset()); Serial.print("\t"); 
+    Serial.print(accelgyro.getZAccelOffset()); Serial.print("\t"); 
+    Serial.print(accelgyro.getXGyroOffset()); Serial.print("\t"); 
+    Serial.print(accelgyro.getYGyroOffset()); Serial.print("\t"); 
+    Serial.print(accelgyro.getZGyroOffset()); Serial.print("\t"); 
+    Serial.print("\n");
+    pinMode(LED_PIN, OUTPUT);
+}
+
+void loop() {
+    static unsigned long lastTime = 0;
+    if (millis() - lastTime >= sampleInterval){
+      lastTime = millis();
+    accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+    float acceleration_mg_x = ax / 9.8;
+    float acceleration_mg_y = ay / 9.8;
+    float acceleration_mg_z = az / 9.8;
+    float jerkX = (acceleration_mg_x - prevAccX) / (sampleInterval / 1000.0);
+    float jerkY = (acceleration_mg_y - prevAccY) / (sampleInterval / 1000.0);
+    float jerkZ = (acceleration_mg_z - prevAccZ) / (sampleInterval / 1000.0);
+    prevAccX = acceleration_mg_x;
+    prevAccY = acceleration_mg_y;
+    prevAccZ = acceleration_mg_z;
+    float jerkMagnitude = sqrt(jerkX * jerkX + jerkY * jerkY + jerkZ * jerkZ);
+    
+    if (jerkMagnitude > fallThreshold)
+    {
+      
+      Serial.println("Fall detected!: ");
+      Serial.println(jerkMagnitude);
+    }
+    else {
+      Serial.println('.');
+
+    }}}
